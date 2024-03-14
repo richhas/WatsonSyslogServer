@@ -1,0 +1,22 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "C#: SyslogServer [Debug .NET 6.0]",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build",
+            "program": "${workspaceFolder}/SyslogServer/bin/Debug/net6.0/SyslogServer.exe",
+            "args": [],
+            "cwd": "${workspaceFolder}/SyslogServer/bin/Debug/net6.0/",
+            "stopAtEntry": false,
+            "console": "externalTerminal"
+        },
+        {
+            "name": "C#: SyslogServer [Default Configuration]",
+            "type": "dotnet",
+            "request": "launch",
+            "projectPath": "${workspaceFolder}\\SyslogServer\\SyslogServer.csproj"
+        }
+    ]
+}
