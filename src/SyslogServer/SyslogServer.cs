@@ -27,6 +27,8 @@ namespace WatsonSyslog
         private static Settings _Settings = new Settings();
         private static Thread _ListenerThread;
         private static UdpClient _ListenerUdp;
+        private static TcpListener _ListenerTcp;
+
         private static DateTime _LastWritten = DateTime.Now;
         private static List<string> _MessageQueue = new List<string>();
         private static readonly object _WriterLock = new object();
@@ -128,6 +130,12 @@ namespace WatsonSyslog
                 _ListenerThread.Start();
                 Console.WriteLine("Listening on UDP/" + _Settings.UdpPort + ".");
 
+                _ListenerTcp = new TcpListener(IPAddress.Any, _Settings.UdpPort);       // Same port is used for both UDP and TCP
+                _ListenerTcp.Start();
+                Thread listenerThreadTcp = new Thread(ReceiverThreadTcp);
+                listenerThreadTcp.Start();
+                Console.WriteLine("Listening on TCP/" + _Settings.UdpPort + ".");
+
                 Task.Run(() => WriterTask());
                 Console.WriteLine("Writer thread started successfully");
             }
@@ -186,6 +194,71 @@ namespace WatsonSyslog
             }
         }
 
+        private static void ReceiverThreadTcp()
+        {
+            try
+            {
+                while (true)
+                {
+                    TcpClient client = _ListenerTcp.AcceptTcpClient();
+                    Task.Run(() => HandleClient(client));
+                }
+            }
+            catch (Exception e)
+            {
+                _ListenerTcp.Stop();
+                Console.WriteLine("***");
+                Console.WriteLine("ReceiverThreadTcp exiting due to exception: " + e.Message);
+                return;
+            }
+        }
+
+        private static void HandleClient(TcpClient client)
+        {
+            try
+            {
+                using (StreamReader reader = new StreamReader(client.GetStream(), Encoding.ASCII))
+                {
+                    while (client.Connected)
+                    {
+                        // Read the length of the message
+                        string lengthStr = "";
+                        char ch;
+                        while ((ch = (char)reader.Read()) != ' ')
+                        {
+                            lengthStr += ch;
+                        }
+
+                        // Convert the length to an integer
+                        int length = int.Parse(lengthStr);
+
+                        // Read the message
+                        char[] buffer = new char[length];
+                        reader.Read(buffer, 0, length);
+                        string receivedData = new string(buffer);
+
+                        string msg = null;
+                        if (_Settings.DisplayTimestamps) msg = DateTime.Now.ToString("MM/dd/yyyy HH:mm:ss") + " ";
+                        msg += receivedData;
+                        Console.WriteLine(msg);
+
+                        lock (_WriterLock)
+                        {
+                            _MessageQueue.Add(msg);
+                        }
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("***");
+                Console.WriteLine("HandleClient exiting due to exception: " + e.Message);
+            }
+            finally
+            {
+                client.Close();
+            }
+        }
         static void WriterTask()
         {
             try
