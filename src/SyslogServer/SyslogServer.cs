@@ -283,6 +283,20 @@ namespace WatsonSyslog
 
                                 if (!File.Exists(currFilename))
                                 {
+                                    // Delete all old files (more than MaxLogFileAgeInDays days old) - assuming the file name as generated above
+                                    string[] files = Directory.GetFiles(_Settings.LogFileDirectory, "*-log.txt");
+                                    foreach (string file in files)
+                                    {
+                                        string dateStr = file.Substring(file.LastIndexOf("-") - 8, 8);
+                                        DateTime fileDate = DateTime.ParseExact(dateStr, "MMddyyyy", null);
+                                        if (DateTime.Compare(fileDate.AddDays(_Settings.MaxLogFileAgeInDays), DateTime.Now) < 0)
+                                        {
+                                            Console.WriteLine("Deleting file: " + file + Environment.NewLine);
+                                            File.Delete(file);
+                                        }
+                                    }
+
+
                                     Console.WriteLine("Creating file: " + currFilename + Environment.NewLine);
                                     {
                                         using (FileStream fsCreate = File.Create(currFilename))

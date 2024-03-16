@@ -39,6 +39,11 @@
             Number of seconds between each log file update.
             </summary>
         </member>
+        <member name="P:WatsonSyslog.Settings.MaxLogFileAgeInDays">
+            <summary>
+            Maximum log file age in days.
+            </summary>
+        </member>
         <member name="M:WatsonSyslog.Settings.#ctor">
             <summary>
             Instantiate.
