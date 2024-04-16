@@ -39,6 +39,8 @@ namespace WatsonSyslog
 
         static void Main(string[] args)
         {
+            AppDomain.CurrentDomain.UnhandledException += UnhandledExceptionHandler;
+
             #region Welcome
 
             Console.WriteLine("---");
@@ -70,7 +72,8 @@ namespace WatsonSyslog
                 catch (Exception)
                 {
                     Console.WriteLine("Unable to deserialize syslog.json, please check syslog.json for correctness, exiting");
-                    Environment.Exit(-1);
+                    throw;
+                    // Environment.Exit(-1);
                 }
             }
 
@@ -116,16 +119,37 @@ namespace WatsonSyslog
             #endregion
         }
 
+        private static void UnhandledExceptionHandler(object sender, UnhandledExceptionEventArgs e)
+        {
+            Console.WriteLine("Unhandled exception occurred, application will restart after delay.");
+            Exception ex = (Exception)e.ExceptionObject;
+            Console.WriteLine("Exception: " + ex.ToString());
+
+            StopServer();
+
+            // Delay before restart
+            System.Threading.Thread.Sleep(TimeSpan.FromSeconds(10));
+
+            // Start a new instance of the application
+            string x = System.Reflection.Assembly.GetExecutingAssembly().Location;
+            x = x.Substring(0, x.Length - 4) + ".exe";
+            var y = System.Diagnostics.Process.Start(x);
+
+            // Terminate the current application
+            Environment.Exit(1);
+        }
         #endregion
 
         #region Private-Methods
 
+        private static volatile bool StopWriterTask;
+
         private static void StartServer()
         {
             try
-            { 
+            {
                 Console.WriteLine("Starting at " + DateTime.Now);
-                  
+
                 _ListenerThread = new Thread(ReceiverThread);
                 _ListenerThread.Start();
                 Console.WriteLine("Listening on UDP/" + _Settings.UdpPort + ".");
@@ -136,6 +160,7 @@ namespace WatsonSyslog
                 listenerThreadTcp.Start();
                 Console.WriteLine("Listening on TCP/" + _Settings.UdpPort + ".");
 
+                StopWriterTask = false;
                 Task.Run(() => WriterTask());
                 Console.WriteLine("Writer thread started successfully");
             }
@@ -143,7 +168,50 @@ namespace WatsonSyslog
             {
                 Console.WriteLine("***");
                 Console.WriteLine("Exiting due to exception: " + e.Message);
-                Environment.Exit(-1);
+                UnhandledExceptionHandler(null, new UnhandledExceptionEventArgs(e, false));
+                throw;
+                // Environment.Exit(-1);
+            }
+        }
+
+        private static void StopServer()
+        {
+            try
+            {
+                // Stop the UDP listener thread
+                _ListenerThread.Interrupt();
+                _ListenerThread.Join();
+                Console.WriteLine("Stopped listening on UDP/" + _Settings.UdpPort + ".");
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("***");
+                Console.WriteLine("Error while stopping the server: " + e.Message);
+            }
+
+            try
+            {
+                // Stop the TCP listener
+                _ListenerTcp.Stop();
+                Console.WriteLine("Stopped listening on TCP/" + _Settings.UdpPort + ".");
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("***");
+                Console.WriteLine("Error while stopping the server: " + e.Message);
+            }
+
+            try
+            {
+                // Stop the writer task
+                StopWriterTask = true;
+                Thread.Sleep(4000);
+                Console.WriteLine("Writer thread stopped successfully");
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("***");
+                Console.WriteLine("Error while stopping the server: " + e.Message);
             }
         }
 
@@ -265,6 +333,10 @@ namespace WatsonSyslog
             {
                 while (true)
                 {
+                    if (StopWriterTask) 
+                    {
+                        return;
+                    }
                     Task.Delay(1000).Wait();
 
                     if (DateTime.Compare(_LastWritten.AddSeconds(_Settings.LogWriterIntervalSec), DateTime.Now) < 0)
@@ -323,7 +395,9 @@ namespace WatsonSyslog
             {
                 Console.WriteLine("***");
                 Console.WriteLine("WriterTask exiting due to exception: " + e.Message);
-                Environment.Exit(-1);
+                UnhandledExceptionHandler(null, new UnhandledExceptionEventArgs(e, false));
+                throw;
+                // Environment.Exit(-1);
             }
         }
 
