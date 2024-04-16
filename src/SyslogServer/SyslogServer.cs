@@ -45,7 +45,7 @@ namespace WatsonSyslog
 
             Console.WriteLine("---");
             Console.WriteLine("Watson Syslog Server | v" + _Version);
-            Console.WriteLine("(c)2022 Joel Christner");
+            Console.WriteLine("(c)2022 Joel Christner, 2024 Richard Hasha");
             Console.WriteLine("https://github.com/jchristn/watsonsyslogserver");
             Console.WriteLine("---");
 
